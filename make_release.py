@@ -88,7 +88,7 @@ if __name__ == "__main__":
         )
 
         with open(f"{tmpdir}/repodata_shard.json", "w") as fp:
-            json.dump(shard)
+            json.dump(shard, fp)
 
         rel.upload_asset(
             f"{tmpdir}/repodata_shard.json",
