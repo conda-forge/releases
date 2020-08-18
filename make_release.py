@@ -82,6 +82,8 @@ if __name__ == "__main__":
     subdir = event_data['client_payload']["subdir"]
     pkg = event_data['client_payload']["package"]
     url = event_data['client_payload']["url"]
+    label = event_data['client_payload']["label"]
+    feedstock = event_data['client_payload']["feedstock"]
     print("subdir/package: %s/%s" % (subdir, pkg), flush=True)
     print("url:", url, flush=True)
 
@@ -99,7 +101,7 @@ if __name__ == "__main__":
 
     # make release and upload if shard does not exist
     with tempfile.TemporaryDirectory() as tmpdir:
-        shard = make_repodata_shard(subdir, pkg, "main", "blah", url, tmpdir)
+        shard = make_repodata_shard(subdir, pkg, label, feedstock, url, tmpdir)
 
         rel = repo.create_git_tag_and_release(
             f"{subdir}/{pkg}",
