@@ -121,6 +121,7 @@ if __name__ == "__main__":
     if r.status_code == 200:
         sha = r.json()["sha"]
     else:
+        print(r.json(), r.status_code, flush=True)
         sha = None
 
     data = {
