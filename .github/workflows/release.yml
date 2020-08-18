@@ -6,16 +6,22 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: actions/checkout@v2
-      - uses: goanpeca/setup-miniconda@v1
+      - name: set up python
+        uses: actions/setup-python@v2
         with:
           python-version: 3.7
-          channels: conda-forge,defaults
-          channel-priority: strict
-          show-channel-urls: true
+      # - uses: goanpeca/setup-miniconda@v1
+      #   with:
+      #     python-version: 3.7
+      #     channels: conda-forge,defaults
+      #     channel-priority: strict
+      #     show-channel-urls: true
       - name: make release
         shell: bash -l {0}
         run: |
-          conda install -y -q git pygithub requests curl
+          # conda install -y -q git pygithub requests curl
+          python -m pip install --upgrade pip
+          pip install pygithub
 
           python make_release.py
         env:
