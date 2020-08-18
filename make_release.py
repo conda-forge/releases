@@ -2,6 +2,7 @@ import os
 import json
 import tempfile
 import subprocess
+import sys
 import copy
 import base64
 
@@ -62,26 +63,41 @@ def make_repodata_shard(subdir, pkg, label, feedstock, url, tmpdir):
 
 
 if __name__ == "__main__":
+    # pull event data
     with open(os.environ["GITHUB_EVENT_PATH"], 'r') as fp:
         event_data = json.load(fp)
-
     event_name = os.environ['GITHUB_EVENT_NAME'].lower()
+    assert event_data["action"] == "release"
 
+    # repo info
     gh = github.Github(os.environ["GITHUB_TOKEN"])
     repo = gh.get_repo("regro/releases")
-
-    sha = subprocess.run(
+    repo_sha = subprocess.run(
         "git rev-parse --verify HEAD",
         shell=True,
         capture_output=True,
     ).stdout.decode("utf-8").strip()
 
+    # package info
     subdir = event_data['client_payload']["subdir"]
     pkg = event_data['client_payload']["package"]
     url = event_data['client_payload']["url"]
     print("subdir/package: %s/%s" % (subdir, pkg), flush=True)
     print("url:", url, flush=True)
 
+    shard_pth = get_shard_path(subdir, pkg)
+
+    # test if shard exists - if so, dump out
+    r = requests.get(
+        "https://api.github.com/repos/regro/"
+        "repodata-shards/contents/%s" % shard_pth,
+        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
+    )
+    if r.status_code == 200:
+        print("*** release already exists - not uploading again! ***", flush=True)
+        sys.exit(1)
+
+    # make release and upload if shard does not exist
     with tempfile.TemporaryDirectory() as tmpdir:
         shard = make_repodata_shard(subdir, pkg, "main", "blah", url, tmpdir)
 
@@ -90,7 +106,7 @@ if __name__ == "__main__":
             "",
             f"{subdir}/{pkg}",
             "",
-            sha,
+            repo_sha,
             "commit",
         )
 
@@ -109,20 +125,9 @@ if __name__ == "__main__":
             content_type="application/json",
         )
 
-    shard_pth = get_shard_path(subdir, pkg, n_dirs=11)
+    # push the repodata shard
     edata = base64.standard_b64encode(
         json.dumps(shard).encode("utf-8")).decode("ascii")
-
-    r = requests.get(
-        "https://api.github.com/repos/regro/"
-        "repodata-shards/contents/%s" % shard_pth,
-        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
-    )
-    if r.status_code == 200:
-        sha = r.json()["sha"]
-    else:
-        print(r.json(), r.status_code, flush=True)
-        sha = None
 
     data = {
         "message": (
@@ -132,20 +137,11 @@ if __name__ == "__main__":
         "branch": "master",
     }
 
-    if sha is not None:
-        data["sha"] = sha
-
     r = requests.put(
         "https://api.github.com/repos/regro/"
         "repodata-shards/contents/%s" % shard_pth,
         headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
-        json={
-            "message": (
-                "[ci skip] [skip ci] [cf admin skip] ***NO_CI*** added "
-                "repodata shard for %s/%s" % (subdir, pkg)),
-            "content": edata,
-            "branch": "master",
-        }
+        json=data
     )
 
     if r.status_code != 201:
