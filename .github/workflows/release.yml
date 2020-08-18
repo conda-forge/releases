@@ -1,0 +1,22 @@
+on: repository_dispatch
+
+jobs:
+  update_shards:
+    name: release
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: goanpeca/setup-miniconda@v1
+        with:
+          python-version: 3.7
+          channels: conda-forge,defaults
+          channel-priority: strict
+          show-channel-urls: true
+      - name: make repodata
+        shell: bash -l {0}
+        run: |
+          conda install -y -q git pygithub requests curl
+
+          python make_release.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
