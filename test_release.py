@@ -7,7 +7,7 @@ subdir, pkg = os.path.split(fname)
 
 gh = github.Github(os.environ["GITHUB_TOKEN"])
 
-repo = gh.get_repo("regeo/releases")
+repo = gh.get_repo("regro/releases")
 repo.create_repository_dispatch(
     "release",
     {

@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import tempfile
 import subprocess
@@ -11,9 +10,7 @@ with open(os.environ["GITHUB_EVENT_PATH"], 'r') as fp:
 
 event_name = os.environ['GITHUB_EVENT_NAME'].lower()
 
-if event_name != "release":
-    sys.exit(1)
-
+print("event_name:", event_name, flush=True)
 
 gh = github.Github(os.environ["GITHUB_TOKEN"])
 repo = gh.get_repo("regro/releases")
