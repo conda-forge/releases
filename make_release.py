@@ -111,6 +111,27 @@ if __name__ == "__main__":
     edata = base64.standard_b64encode(
         json.dumps(shard).encode("utf-8")).decode("ascii")
 
+    r = requests.get(
+        "https://api.github.com/repos/regro/"
+        "repodata-shards/contents/%s" % shard_pth,
+        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
+    )
+    if r.status_code == 200:
+        sha = r.json()["sha"]
+    else:
+        sha = None
+
+    data = {
+        "message": (
+            "[ci skip] [skip ci] [cf admin skip] ***NO_CI*** added "
+            "repodata shard for %s/%s" % (subdir, pkg)),
+        "content": edata,
+        "branch": "master",
+    }
+
+    if sha is not None:
+        data["sha"] = sha
+
     r = requests.put(
         "https://api.github.com/repos/regro/"
         "repodata-shards/contents/%s" % shard_pth,
