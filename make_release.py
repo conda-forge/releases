@@ -2,10 +2,25 @@ import os
 import json
 import tempfile
 import subprocess
-import uuid
 import copy
+import base64
 
 import github
+import requests
+
+
+def get_shard_path(subdir, pkg, n_dirs=12):
+    chars = [c for c in pkg if c.isalnum()]
+    while len(chars) < n_dirs:
+        chars.append("z")
+
+    pth_parts = (
+        ["shards", subdir]
+        + [chars[i] for i in range(n_dirs)]
+        + [pkg + ".json"]
+    )
+
+    return os.path.join(*pth_parts)
 
 
 def make_repodata_shard(subdir, pkg, label, feedstock, url, tmpdir):
@@ -63,18 +78,15 @@ if __name__ == "__main__":
 
     subdir = event_data['client_payload']["subdir"]
     pkg = event_data['client_payload']["package"]
-    sha256 = event_data["client_payload"]["repodata-shard"]["repodata"]["sha256"]
+    url = event_data['client_payload']["url"]
     print("subdir/package: %s/%s" % (subdir, pkg), flush=True)
-
-    url = f"https://conda.anaconda.org/conda-forge/{subdir}/{pkg}"
-
-    uid = uuid.uuid4().hex
+    print("url:", url, flush=True)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         shard = make_repodata_shard(subdir, pkg, "main", "blah", url, tmpdir)
 
         rel = repo.create_git_tag_and_release(
-            f"{uid}/{subdir}/{pkg}",
+            f"{subdir}/{pkg}",
             "",
             f"{subdir}/{pkg}",
             "",
@@ -94,3 +106,24 @@ if __name__ == "__main__":
             f"{tmpdir}/repodata_shard.json",
             content_type="application/json",
         )
+
+    shard_pth = get_shard_path(subdir, pkg)
+    edata = base64.standard_b64encode(
+        json.dumps(shard).encode("utf-8")).decode("ascii")
+
+    r = requests.put(
+        "https://api.github.com/repos/regro/"
+        "repodata-shards/contents/%s" % shard_pth,
+        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
+        json={
+            "message": (
+                "[ci skip] [skip ci] [cf admin skip] ***NO_CI*** added "
+                "repodata shard for %s/%s" % (subdir, pkg)),
+            "content": edata,
+            "branch": "master",
+        }
+    )
+
+    if r.status_code != 201:
+        print("did not make repodata shard for %s/%s!" % (subdir, pkg), flush=True)
+        r.raise_for_status()
