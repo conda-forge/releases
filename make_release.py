@@ -109,7 +109,7 @@ if __name__ == "__main__":
             content_type="application/json",
         )
 
-    shard_pth = get_shard_path(subdir, pkg, n_dirs=4)
+    shard_pth = get_shard_path(subdir, pkg, n_dirs=11)
     edata = base64.standard_b64encode(
         json.dumps(shard).encode("utf-8")).decode("ascii")
 
