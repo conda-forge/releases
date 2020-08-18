@@ -94,10 +94,12 @@ if __name__ == "__main__":
             "commit",
         )
 
-        rel.upload_asset(
+        ast = rel.upload_asset(
             f"{tmpdir}/{subdir}/{pkg}",
             content_type="application/x-bzip2",
         )
+
+        shard["url"] = ast.browser_download_url
 
         with open(f"{tmpdir}/repodata_shard.json", "w") as fp:
             json.dump(shard, fp)
