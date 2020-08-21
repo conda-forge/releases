@@ -15,7 +15,7 @@ jobs:
       - name: make release
         shell: bash -l {0}
         run: |
-          conda install -y -q git pygithub requests curl conda conda-build
+          conda install -y -q git pygithub requests curl conda conda-build tenacity
 
           python make_release.py
         env:

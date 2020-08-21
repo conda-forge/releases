@@ -8,6 +8,7 @@ import base64
 
 import github
 import requests
+import tenacity
 
 
 def get_shard_path(subdir, pkg, n_dirs=12):
@@ -24,16 +25,23 @@ def get_shard_path(subdir, pkg, n_dirs=12):
     return os.path.join(*pth_parts)
 
 
+@tenacity.retry(
+    wait=tenacity.wait_random_exponential(multiplier=1, max=60),
+    stop=tenacity.stop_after_attempt(10),
+    reraise=True,
+)
 def make_repodata_shard(subdir, pkg, label, feedstock, url, tmpdir):
     os.makedirs(f"{tmpdir}/noarch", exist_ok=True)
     os.makedirs(f"{tmpdir}/{subdir}", exist_ok=True)
     subprocess.run(
         f"curl -L {url} > {tmpdir}/{subdir}/{pkg}",
-        shell=True
+        shell=True,
+        check=True,
     )
     subprocess.run(
         f"conda index --no-progress {tmpdir}",
-        shell=True
+        shell=True,
+        check=True,
     )
 
     with open(f"{tmpdir}/channeldata.json", "r") as fp:
@@ -60,6 +68,93 @@ def make_repodata_shard(subdir, pkg, label, feedstock, url, tmpdir):
     shard["channeldata"]["version"] = rd["packages"][pkg]["version"]
 
     return shard
+
+
+@tenacity.retry(
+    wait=tenacity.wait_random_exponential(multiplier=1, max=60),
+    stop=tenacity.stop_after_attempt(10),
+    reraise=True,
+)
+def shard_exists(shard_pth):
+    r = requests.get(
+        "https://api.github.com/repos/regro/"
+        "repodata-shards/contents/%s" % shard_pth,
+        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
+    )
+    if r.status_code == 200:
+        return True
+    elif r.status_code == 404:
+        return False
+    else:
+        r.raise_for_status()
+
+
+@tenacity.retry(
+    wait=tenacity.wait_random_exponential(multiplier=1, max=60),
+    stop=tenacity.stop_after_attempt(10),
+    reraise=True,
+)
+def get_or_make_release(repo, tag, repo_sha):
+    try:
+        rel = repo.get_releas(tag)
+    except github.UnknownObjectException:
+        rel = repo.create_git_tag_and_release(
+            tag,
+            "",
+            tag,
+            "",
+            repo_sha,
+            "commit",
+        )
+
+    return rel
+
+
+@tenacity.retry(
+    wait=tenacity.wait_random_exponential(multiplier=1, max=60),
+    stop=tenacity.stop_after_attempt(10),
+    reraise=True,
+)
+def upload_asset(rel, pth, content_type):
+    name = os.path.basename(pth)
+    ast = None
+    for ast in rel.get_assets():
+        if ast.name == name:
+            break
+
+    if ast is None:
+        ast = rel.upload_asset(pth, content_type=content_type)
+
+    return ast
+
+
+@tenacity.retry(
+    wait=tenacity.wait_random_exponential(multiplier=1, max=60),
+    stop=tenacity.stop_after_attempt(10),
+    reraise=True,
+)
+def push_shard(shard, shard_pth, subdir, pkg):
+    if not shard_exists(shard_pth):
+        edata = base64.standard_b64encode(
+            json.dumps(shard).encode("utf-8")).decode("ascii")
+
+        data = {
+            "message": (
+                "[ci skip] [skip ci] [cf admin skip] ***NO_CI*** added "
+                "repodata shard for %s/%s" % (subdir, pkg)),
+            "content": edata,
+            "branch": "master",
+        }
+
+        r = requests.put(
+            "https://api.github.com/repos/regro/"
+            "repodata-shards/contents/%s" % shard_pth,
+            headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
+            json=data
+        )
+
+        if r.status_code != 201:
+            r.raise_for_status()
 
 
 if __name__ == "__main__":
@@ -90,62 +185,30 @@ if __name__ == "__main__":
     shard_pth = get_shard_path(subdir, pkg)
 
     # test if shard exists - if so, dump out
-    r = requests.get(
-        "https://api.github.com/repos/regro/"
-        "repodata-shards/contents/%s" % shard_pth,
-        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
-    )
-    if r.status_code == 200:
+    if shard_exists(shard_pth):
         print("*** release already exists - not uploading again! ***", flush=True)
         sys.exit(1)
 
     # make release and upload if shard does not exist
     with tempfile.TemporaryDirectory() as tmpdir:
         shard = make_repodata_shard(subdir, pkg, label, feedstock, url, tmpdir)
+        rel = get_or_make_release(repo, f"{subdir}/{pkg}", repo_sha)
 
-        rel = repo.create_git_tag_and_release(
-            f"{subdir}/{pkg}",
-            "",
-            f"{subdir}/{pkg}",
-            "",
-            repo_sha,
-            "commit",
-        )
-
-        ast = rel.upload_asset(
+        ast = upload_asset(
+            rel,
             f"{tmpdir}/{subdir}/{pkg}",
             content_type="application/x-bzip2",
         )
 
         shard["url"] = ast.browser_download_url
-
         with open(f"{tmpdir}/repodata_shard.json", "w") as fp:
             json.dump(shard, fp)
 
-        rel.upload_asset(
+        ast = upload_asset(
+            rel,
             f"{tmpdir}/repodata_shard.json",
             content_type="application/json",
         )
 
     # push the repodata shard
-    edata = base64.standard_b64encode(
-        json.dumps(shard).encode("utf-8")).decode("ascii")
-
-    data = {
-        "message": (
-            "[ci skip] [skip ci] [cf admin skip] ***NO_CI*** added "
-            "repodata shard for %s/%s" % (subdir, pkg)),
-        "content": edata,
-        "branch": "master",
-    }
-
-    r = requests.put(
-        "https://api.github.com/repos/regro/"
-        "repodata-shards/contents/%s" % shard_pth,
-        headers={"Authorization": "token %s" % os.environ["GITHUB_TOKEN"]},
-        json=data
-    )
-
-    if r.status_code != 201:
-        print("did not make repodata shard for %s/%s!" % (subdir, pkg), flush=True)
-        r.raise_for_status()
+    push_shard(shard, shard_pth, subdir, pkg)
