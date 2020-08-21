@@ -17,6 +17,13 @@ jobs:
         run: |
           conda install -y -q git pygithub requests curl conda conda-build tenacity
 
-          python make_release.py
+          pushd ..
+          git clone --depth=1 https://github.com/regro/repodata-tools.git
+          rt_pth=`pwd`/repodata-tools
+          popd
+
+          conda install -y -q --file ${rt_pth}/requirements.txt
+
+          python ${rt_pth}/scripts/make_release.py
         env:
           GITHUB_TOKEN: ${{ secrets.MY_PAT }}
