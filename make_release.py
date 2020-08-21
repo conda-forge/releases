@@ -96,7 +96,7 @@ def shard_exists(shard_pth):
 )
 def get_or_make_release(repo, tag, repo_sha):
     try:
-        rel = repo.get_releas(tag)
+        rel = repo.get_release(tag)
     except github.UnknownObjectException:
         rel = repo.create_git_tag_and_release(
             tag,
