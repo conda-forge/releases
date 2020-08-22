@@ -15,11 +15,7 @@ jobs:
       - name: make release
         shell: bash -l {0}
         run: |
-          conda install -y -q git pygithub requests curl conda conda-build tenacity
-
-          git config --global user.email 'conda.forge.daemon@gmail.com'
-          git config --global user.name 'conda-forge-daemon'
-          git config --global pull.rebase true
+          conda install -y -q git
 
           pushd ..
           git clone --depth=1 https://github.com/regro/repodata-tools.git
