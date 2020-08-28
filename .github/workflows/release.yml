@@ -7,7 +7,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          depth: 0
           fetch-depth: 0
       - uses: goanpeca/setup-miniconda@v1
         with:
