@@ -5,9 +5,6 @@ jobs:
     name: release
     runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - uses: goanpeca/setup-miniconda@v1
         with:
           python-version: 3.7
@@ -22,14 +19,22 @@ jobs:
           git config --global user.email '64793534+conda-forge-daemon@users.noreply.github.com'
           git config --global pull.rebase false
 
-          pushd ..
+          git clone --no-tags https://github.com/regro/releases.git
+          pushd releases
+          repo_url=https://${GITHUB_TOKEN}@github.com/regro/releases.git
+          git remote set-url --push origin ${repo_url}
+          popd
+
           git clone --depth=1 https://github.com/regro/repodata-tools.git
           pushd repodata-tools
           conda install -y -q --file requirements.txt
           pip install -e .
           popd
-          popd
 
+          pushd releases
           make-github-release
+          popd
+          
+          rm -rf releases
         env:
           GITHUB_TOKEN: ${{ secrets.MY_PAT }}
