@@ -25,7 +25,7 @@ jobs:
           git remote set-url --push origin ${repo_url}
           popd
 
-          git clone --depth=1 https://github.com/regro/repodata-tools.git
+          git clone --depth=1 https://github.com/conda-forge/repodata-tools.git
           pushd repodata-tools
           conda install -y -q --file requirements.txt
           pip install -e .
