@@ -19,9 +19,9 @@ jobs:
           git config --global user.email '64793534+conda-forge-daemon@users.noreply.github.com'
           git config --global pull.rebase false
 
-          git clone --no-tags https://github.com/regro/releases.git
+          git clone --no-tags https://github.com/conda-forge/releases.git
           pushd releases
-          repo_url=https://${GITHUB_TOKEN}@github.com/regro/releases.git
+          repo_url=https://${GITHUB_TOKEN}@github.com/conda-forge/releases.git
           git remote set-url --push origin ${repo_url}
           popd
 
