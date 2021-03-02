@@ -5,6 +5,12 @@ jobs:
     name: release
     runs-on: "ubuntu-latest"
     steps:
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.CF_CURATOR_APP_ID }}
+          private_key: ${{ secrets.CF_CURATOR_PRIVATE_KEY }}
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: 3.7
@@ -37,4 +43,4 @@ jobs:
           
           rm -rf releases
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_PAT }}
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
